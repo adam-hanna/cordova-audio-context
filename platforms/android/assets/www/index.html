@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<!--
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+     KIND, either express or implied.  See the License for the
+    specific language governing permissions and limitations
+    under the License.
+-->
+<html>
+    <head>
+        <!--
+        Customize this policy to fit your own app's needs. For more guidance, see:
+            https://github.com/apache/cordova-plugin-whitelist/blob/master/README.md#content-security-policy
+        Some notes:
+            * gap: is required only on iOS (when using UIWebView) and is needed for JS->native communication
+            * https://ssl.gstatic.com is required only on Android and is needed for TalkBack to function properly
+            * Disables use of inline scripts in order to mitigate risk of XSS vulnerabilities. To change this:
+                * Enable inline JS: add 'unsafe-inline' to default-src
+        -->
+        <!--<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: gap: https://ssl.gstatic.com 'unsafe-eval'; style-src 'self' 'unsafe-inline'; media-src *; img-src 'self' data: content:;">-->
+        <meta name="format-detection" content="telephone=no">
+        <meta name="msapplication-tap-highlight" content="no">
+        <meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width">
+        <link rel="stylesheet" type="text/css" href="css/index.css">
+        <title>Hello World</title>
+    </head>
+    <body>
+        <div class="app">
+            <h3>First, choose a file</h3>
+            <input id="input" type="file" accept="audio/*" onchange="inputChanged()"/>
+            <h3>Second, play the file</h3>
+            <audio id="audio" loop controls></audio>
+            <h3>Third, hit the record button. Click again to stop recording.</h3>
+            <button id="record" data-state="stopped">Record</button>
+            <h3>Finally, listen to your recording!</h3>
+            <audio id="player" controls></audio>
+        </div>
+        <script type="text/javascript">
+            /*
+             * Licensed to the Apache Software Foundation (ASF) under one
+             * or more contributor license agreements.  See the NOTICE file
+             * distributed with this work for additional information
+             * regarding copyright ownership.  The ASF licenses this file
+             * to you under the Apache License, Version 2.0 (the
+             * "License"); you may not use this file except in compliance
+             * with the License.  You may obtain a copy of the License at
+             *
+             * http://www.apache.org/licenses/LICENSE-2.0
+             *
+             * Unless required by applicable law or agreed to in writing,
+             * software distributed under the License is distributed on an
+             * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+             * KIND, either express or implied.  See the License for the
+             * specific language governing permissions and limitations
+             * under the License.
+             */
+
+            // elems
+            var input = document.getElementById("input")
+            var audio = document.getElementById("audio")
+            var record = document.getElementById("record")
+            var player = document.getElementById("player")
+
+            // html5 audio
+            var context = new (window.AudioContext || window.webkitAudioContext)()
+            var recorderDest = context.createMediaStreamDestination()
+            var chunks = []
+            var mediaRecorder = new window.MediaRecorder(recorderDest.stream)
+            mediaRecorder.ondataavailable = function (e) {
+                // push each chunk (blobs) in an array
+                chunks.push(e.data)
+            }
+            mediaRecorder.onstop = function (e) {
+                // Make blob out of our blobs, and open it.
+                var blob = new window.Blob(
+                    chunks,
+                    {
+                        "type": "audio/ogg; codecs=opus"
+                    }
+                )
+
+                player.src = window.URL.createObjectURL(blob)
+                window.theBlob = blob
+                chunks = []
+            }
+            var app = {
+                // Application Constructor
+                initialize: function() {
+                    document.addEventListener('deviceready', this.onDeviceReady.bind(this), false);
+
+                    // events
+                    record.addEventListener("click", function (e) {
+                        console.log("click", record.dataset.state)
+                        if (record.dataset.state === "stopped") {
+                            // first, create a blank buffer
+                            // we need to do this because we need to "record" negative space
+                            // or times when a pad isn't playing
+                            // https://developer.mozilla.org/en-US/docs/Web/API/AudioContext/createBuffer
+                            var blankBuffer = context.createBuffer(2, 22050, 44100)
+                            var blankSource = context.createBufferSource()
+                            blankSource.buffer = blankBuffer
+                            blankSource.connect(recorderDest)
+                            blankSource.loop = true
+                            blankSource.start(0)
+
+                            mediaRecorder.start()
+                            record.dataset.state = "recording"
+                            record.innerHTML = "recording"
+                            record.style.backgroundColor = "red"
+                        } else {
+                            mediaRecorder.stop()
+                            record.dataset.state = "stopped"
+                            record.innerHTML = "record"
+                            record.style.backgroundColor = "white"
+                        }
+                    })
+                },
+
+                // deviceready Event Handler
+                //
+                // Bind any cordova events here. Common events are:
+                // 'pause', 'resume', etc.
+                onDeviceReady: function() {
+                    this.receivedEvent('deviceready');
+                },
+
+                // Update DOM on a Received Event
+                receivedEvent: function(id) {
+                    var parentElement = document.getElementById(id);
+                    var listeningElement = parentElement.querySelector('.listening');
+                    var receivedElement = parentElement.querySelector('.received');
+
+                    listeningElement.setAttribute('style', 'display:none;');
+                    receivedElement.setAttribute('style', 'display:block;');
+
+                    console.log('Received Event: ' + id);
+                }
+            };
+
+            app.initialize();
+
+            function inputChanged () {
+                console.log("changed")
+                var file = input.files[0]
+                var fileUrl = window.URL.createObjectURL(file)
+                
+                audio.src = fileUrl
+
+                var source = context.createMediaElementSource(audio)
+                source.connect(context.destination)
+                source.connect(recorderDest)
+            }
+        </script>
+    </body>
+</html>
