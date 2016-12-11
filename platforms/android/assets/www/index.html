@@ -90,7 +90,12 @@
                     }
                 )
 
-                player.src = window.URL.createObjectURL(blob)
+                var reader = new window.FileReader()
+                reader.readAsDataURL(blob)
+                reader.onloadend = function() {
+                    player.src = reader.result
+                }
+                // player.src = window.URL.createObjectURL(blob)
                 window.theBlob = blob
                 chunks = []
             }
